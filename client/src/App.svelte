@@ -12,7 +12,7 @@
       {
         price: 9,
         amount: 20,
-        total: 160,
+        total: 180,
       },
       {
         price: 8,
@@ -24,7 +24,7 @@
       {
         price: 7,
         amount: 20,
-        total: 150,
+        total: 140,
       },
       {
         price: 5,
@@ -54,7 +54,15 @@
       timestamp: 1668886837,
       price: 9,
       amount: 20,
-      total: 160,
+      total: 180,
+    },
+    {
+      userId: "tom",
+      symbol: "TWTR",
+      timestamp: 1668896837,
+      price: 7,
+      amount: 20,
+      total: 140,
     },
   ];
 
@@ -70,8 +78,8 @@
       if (event.data.messageType === "aggOrderBook") {
         aggOrderBook = JSON.parse(event.data);
       }
-      if (event.data.messageType === "trade") {
-        trades.push(JSON.parse(event.data));
+      if (event.data.messageType === "trades") {
+        trades = JSON.parse(event.data);
       }
     });
   });
