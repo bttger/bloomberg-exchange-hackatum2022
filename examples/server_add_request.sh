@@ -1,5 +1,5 @@
 #!/bin/sh
 
-server='http://localhost:3000/api/add'
+server='ws://127.0.0.1:3000/api'
 
-curl -X POST -H 'Content-Type: application/json' -d '' "$server"
+echo '{"Add":{"user":"jalil","stock":"IBM","side":"sell","price":10,"quantity":100}}' | websocat "$server"

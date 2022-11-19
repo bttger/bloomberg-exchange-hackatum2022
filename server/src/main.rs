@@ -8,19 +8,9 @@ use axum::{
     Extension, Router,
 };
 use serde::{Deserialize, Serialize};
-use sqlx::postgres::{PgConnection, PgPoolOptions};
-use std::{
-    net::SocketAddr,
-    sync::{atomic::AtomicU64, Arc},
-};
+use std::{net::SocketAddr, sync::Arc};
 use tower_http::trace::{DefaultMakeSpan, TraceLayer};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
-// use uuid::Uuid;
-
-// type State = RwLock<()>;
-// type ServerResult<T> = Result<T, StatusCode>;
-
-static ORDER_ID: AtomicU64 = AtomicU64::new(0);
 
 #[derive(Deserialize, Serialize)]
 enum Side {
@@ -30,13 +20,22 @@ enum Side {
     Sell,
 }
 
+impl Side {
+    fn to_i16(&self) -> i16 {
+        match self {
+            Self::Buy => 0,
+            Self::Sell => 1,
+        }
+    }
+}
+
 #[derive(Deserialize, Serialize)]
 struct Add {
     user: String,
     side: Side,
     stock: String,
-    price: u64,
-    quantity: u64,
+    price: i64,
+    quantity: i64,
 }
 
 #[derive(Deserialize, Serialize)]
@@ -44,8 +43,8 @@ struct Del {
     user: String,
     side: Side,
     stock: String,
-    price: u64,
-    quantity: u64,
+    price: i64,
+    quantity: i64,
 }
 
 #[derive(Deserialize, Serialize)]
@@ -63,9 +62,10 @@ struct MatchFilter {
     stock: Option<String>,
 }
 
+type Database = tokio_postgres::Client;
+
 #[tokio::main]
 async fn main() {
-    // let _state: Arc<State> = Arc::new(State::default());
     tracing_subscriber::registry()
         .with(tracing_subscriber::EnvFilter::new(
             std::env::var("RUST_LOG").unwrap_or_else(|_| "server=debug,tower_http=debug".into()),
@@ -73,11 +73,18 @@ async fn main() {
         .with(tracing_subscriber::fmt::layer())
         .init();
 
-    let Ok(database_pool) = PgPoolOptions::new().max_connections(4).connect("postgresql://hackatum2022@localhost:5432/hackatum2022").await else {
-        tracing::error!("Failed to connect to test database");
-        return;
-    };
-    let database_pool = Arc::new(database_pool);
+    let (client, connection) =
+        tokio_postgres::connect("host=localhost user=hackatum2022", tokio_postgres::NoTls)
+            .await
+            .unwrap();
+
+    tokio::spawn(async move {
+        if let Err(err) = connection.await {
+            tracing::error!("Failed to establish database connection: {err}")
+        }
+    });
+
+    let database_pool = Arc::new(client);
 
     let app = Router::new()
         .route("/", get(|| async { "To access the API go to /api" }))
@@ -99,7 +106,7 @@ async fn main() {
 
 async fn api(
     ws: WebSocketUpgrade,
-    Extension(pool): Extension<Arc<PgConnection>>,
+    Extension(pool): Extension<Arc<Database>>,
     user_agent: Option<TypedHeader<axum::headers::UserAgent>>,
 ) -> impl IntoResponse {
     if let Some(TypedHeader(user_agent)) = user_agent {
@@ -117,7 +124,7 @@ enum WebSocketMessage {
     Match(MatchFilter),
 }
 
-async fn handle_socket(mut socket: WebSocket, _pool: Arc<PgConnection>) {
+async fn handle_socket(mut socket: WebSocket, pool: Arc<Database>) {
     while let Some(msg) = socket.recv().await {
         let Ok(msg) = msg else {tracing::warn!("Failed to recieve Message"); return;};
         // Parse Message
@@ -144,15 +151,29 @@ async fn handle_socket(mut socket: WebSocket, _pool: Arc<PgConnection>) {
                 price,
                 quantity,
             }) => {
-                sqlx::query!(
-                    "INSERT INTO orders VALUES (?, ?, ?, ?, ?, ?);",
-                    ORDER_ID,
-                    chrono::offset::Utc::now().timestamp_micros(),
-                    &user,
-                    &stock,
-                    quantity,
-                    price
-                )
+                if let Err(err) = pool.query(
+                            "INSERT INTO orders (time_, user_id, type_, exec_type, symbol, amount, price) VALUES ($1, $2::VARCHAR, $3, $4::SMALLINT, $5::VARCHAR, $6::BIGINT, $7::BIGINT);",
+                            &[&chrono::offset::Utc::now().timestamp(),
+                            &user,
+                            &side.to_i16(),
+                            &0i16,
+                            &stock,
+                            &quantity,
+                            &price]
+                        ).await {
+                    tracing::warn!("Failed to execute query: {err}");
+                }
+                // let query = sqlx::query("INSERT INTO orders (time_, user_id, type_, exec_type, symbol, amount, price) VALUES (?, ?, ?, ?, ?, ?, ?);")
+                //         .bind(chrono::offset::Utc::now().timestamp_micros())
+                //         .bind(&user)
+                //         .bind(match side { Side::Buy => 0, Side::Sell => 1})
+                //         .bind(0)
+                //         .bind(&stock)
+                //         .bind(quantity)
+                //         .bind(price)
+                //         ;
+                // tracing::debug!("Running query: {}", query.sql());
+                // query.fetch_all(pool.deref()).await.expect("valid query");
             }
             WebSocketMessage::Del(_) => todo!("Del"),
             WebSocketMessage::List(_) => todo!("List"),
