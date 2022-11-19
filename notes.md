@@ -17,12 +17,22 @@
   - OBS updates DB
   - -"- publishes event in order channel (which the matching server and all clients are subscribed to)
 
+# Stack
+
+## Server
+- Rust, Axum for WebSocket handling
+- PostgreSQL with Timescale extension
+- Redis as our Pub/Sub broker
+
+## Client
+- Svelte web app with WebSockets
+
 # Tables
 
 ## Orders
 ```
 id string (uuid or nano id)
-time int (unix timestamp)
+timestamp int (unix timestamp)
 user_id string (random maybe in pattern user#123)
 type enum ('bid', 'ask')
 exec_type enum ('market', 'limit')
@@ -33,10 +43,37 @@ price float (optional, only for limit orders)
 ## Trades
 ```
 id string (uuid or nano id)
-time int (unix timestamp)
+timestamp int (unix timestamp)
 user_id string
 amount float
 avg_price float (when multiple entries from order book needed to fulfil trade)
+```
+
+## Queries
+
+**addOrder(args[])** (executed by OBS)
+```sql
+INSERT INTO orders VALUES (id, timestamp, user_id, type, exec_type, amount, price);
+```
+
+**addTrade(args[])** (executed by MS)
+```sql
+INSERT INTO trades VALUES (id, timestamp, user_id, amount, avg_price);
+```
+
+**getLatestTrades(number int)** (only queried on client init and trade event by OBS)
+```sql
+SELECT timestamp, user_id, amount, avg_price FROM trades ORDER BY timestamp DESC LIMIT $number;
+```
+
+**getAggOrderBook(number int)** (only queried on client init and order event by OBS)
+```sql
+SELECT price, amount, price * amount AS total FROM orders WHERE type = 'ask' GROUP BY ...;TODO
+```
+
+**TODO()**
+```sql
+
 ```
 
 # API
@@ -50,22 +87,23 @@ avg_price float (when multiple entries from order book needed to fulfil trade)
 
 ```
 aggOrderBook: {
-    ask: [{
-        price float
-        amount float
-        total float
-    }],
-    bid: [{
-        price float
-        amount float
-        total float
-    }]
+  timestamp int,
+  ask: [{
+      price float
+      amount float
+      total float
+  }],
+  bid: [{
+      price float
+      amount float
+      total float
+  }]
 }
 
 trades: [{
     userId string
     security string
-    time int (unix timestamp)
+    timestamp int
     price float
     amount float
     total float
