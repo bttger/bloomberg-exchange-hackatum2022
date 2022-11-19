@@ -157,24 +157,24 @@ ORDER BY time_ ASC;
 aggOrderBook: {
   timestamp int,
   ask: [{
-      price float
-      amount float
-      total float
+      price int
+      amount int
+      total int
   }],
   bid: [{
-      price float
-      amount float
-      total float
+      price int
+      amount int
+      total int
   }]
 }
 
 trades: [{
     userId string
-    security string
+    symbol string
     timestamp int
-    price float
-    amount float
-    total float
+    price int
+    amount int
+    total int
 }]
 
 ```
