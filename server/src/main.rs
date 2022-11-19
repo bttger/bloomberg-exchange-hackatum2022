@@ -114,20 +114,20 @@ enum WebSocketMessage {
 
 async fn handle_socket(mut socket: WebSocket, _pool: Arc<PgConnection>) {
     while let Some(msg) = socket.recv().await {
-        let Ok(msg) = msg else {eprintln!("Failed to recieve Message"); return;};
+        let Ok(msg) = msg else {tracing::warn!("Failed to recieve Message"); return;};
         // Parse Message
         let Ok(msg) = (match msg {
             Message::Text(msg) => serde_json::from_str::<WebSocketMessage>(&msg),
             Message::Binary(_) | Message::Ping(_) | Message::Pong(_) => {
                 let _ = socket.close().await;
-                eprintln!("Didn't get a text message, closing socket");
+                tracing::warn!("Didn't get a text message, closing socket");
                 return;
             },
             Message::Close(_) => return,
         }) else {
             let _ = socket.send(Message::Text("Invalid JSON".to_string())).await;
             let _ = socket.close().await;
-            eprintln!("Got invalid JSON, closing socket");
+            tracing::warn!("Got invalid JSON, closing socket");
             return;
         };
 
