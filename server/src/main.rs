@@ -42,8 +42,8 @@ struct Add {
     #[serde(rename = "type")]
     type_: Side,
     symbol: String,
-    price: i64,
-    amount: i64,
+    price: i32,
+    amount: i32,
 }
 
 #[derive(Deserialize, Serialize)]
@@ -52,8 +52,8 @@ struct Del {
     #[serde(rename = "type")]
     type_: Side,
     symbol: String,
-    price: i64,
-    amount: i64,
+    price: i32,
+    amount: i32,
 }
 
 #[derive(Deserialize, Serialize)]
@@ -183,7 +183,7 @@ async fn handle_socket(mut socket: WebSocket, pool: Arc<Database>) {
                     Ok(rows) => {
                         // Coalesce amount
                         for row in rows.into_iter() {
-                            amount += row.get::<&str, i64>("amount");
+                            amount += row.get::<&str, i32>("amount");
                         }
                     },
                     Err(err) => {
