@@ -138,7 +138,7 @@ static COALESCE_ADDS: &str = "
 DELETE FROM orders
     WHERE user_id=$1::VARCHAR
         AND type_=$2::SMALLINT
-        AND excec_type=$3::SMALLINT
+        AND exec_type=$3::SMALLINT
         AND symbol=$4::VARCHAR
         AND price=$5::BIGINT
     RETURNING *;";
