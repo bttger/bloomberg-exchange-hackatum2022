@@ -56,7 +56,7 @@ avg_price float (when multiple entries from order book needed to fulfil trade)
 ## Schema
 ```sql
 CREATE TABLE IF NOT EXISTS orders (
-  id varchar,
+  id varchar PRIMARY KEY,
   time_ bigint,
   user_id varchar,
   type_ smallint,
@@ -67,7 +67,7 @@ CREATE TABLE IF NOT EXISTS orders (
 );
 
 CREATE TABLE IF NOT EXISTS trades (
-  id varchar,
+  id varchar PRIMARY KEY,
   time_ bigint,
   user_id varchar,
   symbol varchar,
@@ -96,14 +96,14 @@ SELECT timestamp, user_id, amount, avg_price FROM trades WHERE symbol = $symbol 
 **getAggOrderBook(symbol string)** (only queried on client init and order event by OBS)
 ```sql
 example orders:
-9.76 794.87
-9.45 789.93
+2 794
+5 789
 
 example ranges:
->=9.7 
->=9.6
->=9.5
->=9.4
+>=5 
+>=4
+>=3
+>=2
 
 SELECT max(price) FROM orders WHERE type = 'bid' AND exec_type = 'limit' AND symbol = $symbol
 
