@@ -1,6 +1,6 @@
 # Tasks
 
-For now we will hard-code the security symbol that clients trade on the exchange. Though the database schema will support many securities.
+For now we will hard-code the security symbol that clients trade on the exchange. Though the database schema will support many securities. Another design decision is that we don't allow fractional buys/sells and prices must be integers.
 
 - order book server (OBS) starts
   - OBS subscribes to trade channel
@@ -57,22 +57,22 @@ avg_price float (when multiple entries from order book needed to fulfil trade)
 ```sql
 CREATE TABLE IF NOT EXISTS orders (
   id varchar
-  timestamp int
+  timestamp bigint
   user_id varchar
   type smallint
   exec_type smallint
   symbol varchar
-  amount double
-  price double
+  amount int
+  price int
 );
 
 CREATE TABLE IF NOT EXISTS trades (
   id varchar
-  timestamp int
+  timestamp bigint
   user_id varchar
   symbol varchar
-  amount double
-  avg_price double
+  amount int
+  avg_price int
 );
 ```
 
@@ -96,11 +96,11 @@ SELECT timestamp, user_id, amount, avg_price FROM trades WHERE symbol = $symbol 
 **getAggOrderBook(symbol string)** (only queried on client init and order event by OBS)
 ```sql
 example orders:
-9.76
-9.45
+9.76 794.87
+9.45 789.93
 
 example ranges:
->=9.7
+>=9.7 
 >=9.6
 >=9.5
 >=9.4
