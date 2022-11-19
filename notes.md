@@ -120,14 +120,22 @@ WITH ranges AS (SELECT generate_series(
 ) as range_from)
 SELECT
   ranges.range_from / 10 AS range_from,
-  (SELECT sum(amount) FROM orders WHERE price >= range_from AND price < ?)amount, price * amount AS total
+  (SELECT sum(amount) FROM orders WHERE type = 'bid' AND exec_type = 'limit' AND symbol = $symbol AND price >= range_from AND price < range_from + 1) AS amount,
+  (SELECT sum() FROM orders WHERE type = 'bid' AND exec_type = 'limit' AND symbol = $symbol AND price >= range_from AND price < range_from + 1 GROUP BY price) AS total
 FROM orders
 WHERE type = 'ask' AND symbol = $symbol;
-```
 
-**TODO()**
-```sql
+SELECT price, sum(amount) AS total_amount, total_amount * price AS total_price
+FROM orders
+WHERE type_ = 0 AND exec_type = 1 AND symbol = $symbol
+GROUP BY price
+ORDER BY price DESC;
 
+SELECT price, sum(amount) AS total_amount, total_amount * price AS total_price
+FROM orders
+WHERE type_ = 1 AND exec_type = 1 AND symbol = $symbol
+GROUP BY price
+ORDER BY price DESC;
 ```
 
 # API
