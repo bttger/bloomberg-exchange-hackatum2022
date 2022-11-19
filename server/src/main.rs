@@ -87,8 +87,7 @@ async fn main() {
     let database_pool = Arc::new(client);
 
     let app = Router::new()
-        .route("/", get(|| async { "To access the API go to /api" }))
-        .route("/api", get(api))
+        .route("/", get(api))
         .layer(
             TraceLayer::new_for_http()
                 .make_span_with(DefaultMakeSpan::default().include_headers(true)),
