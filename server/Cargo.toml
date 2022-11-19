@@ -4,12 +4,17 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-axum = { version = "0.5.17", features = ["ws"] }
+axum = { version = "0.5.17", features = ["ws", "headers"] }
 futures = "0.3.25"
 hyper = { version = "0.14.23", features = ["full"] }
 serde = { version = "1.0.147", features = ["derive", "alloc"] }
+serde_json = { version = "1.0.88", features = ["alloc"] }
+sqlx = { version = "0.6.2", features = ["runtime-tokio-native-tls", "postgres"] }
 tokio = { version = "1.21.2", features = ["full"] }
 tower = "0.4.13"
-uuid = { version = "1.2.2", features = ["serde"] }
+tower-http = { version = "0.3.4", features = ["trace"] }
+tracing = "0.1.37"
+tracing-subscriber = { version = "0.3.16", features = ["env-filter"] }
+uuid = { version = "1.2.2", features = ["serde", "v4"] }
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
