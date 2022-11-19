@@ -57,9 +57,9 @@ avg_price float (when multiple entries from order book needed to fulfil trade)
 ```sql
 CREATE TABLE IF NOT EXISTS orders (
   id varchar
-  timestamp bigint
+  time_ bigint
   user_id varchar
-  type smallint
+  type_ smallint
   exec_type smallint
   symbol varchar
   amount int
@@ -68,7 +68,7 @@ CREATE TABLE IF NOT EXISTS orders (
 
 CREATE TABLE IF NOT EXISTS trades (
   id varchar
-  timestamp bigint
+  time_ bigint
   user_id varchar
   symbol varchar
   amount int
