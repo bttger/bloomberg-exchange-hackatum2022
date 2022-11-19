@@ -27,39 +27,47 @@ impl Side {
             Self::Sell => 1,
         }
     }
+
+    fn other(&self) -> Self {
+        match self {
+            Side::Buy => Self::Sell,
+            Side::Sell => Self::Buy,
+        }
+    }
 }
 
 #[derive(Deserialize, Serialize)]
 struct Add {
-    user: String,
-    side: Side,
-    stock: String,
+    user_id: String,
+    #[serde(rename = "type")]
+    type_: Side,
+    symbol: String,
     price: i64,
-    quantity: i64,
+    amount: i64,
 }
 
 #[derive(Deserialize, Serialize)]
 struct Del {
-    user: String,
-    side: Side,
-    stock: String,
+    user_id: String,
+    #[serde(rename = "type")]
+    type_: Side,
+    symbol: String,
     price: i64,
-    quantity: i64,
+    amount: i64,
 }
 
 #[derive(Deserialize, Serialize)]
 struct ListFilter {
-    user: Option<String>,
-    side: Option<Side>,
-    stock: Option<String>,
+    user_id: Option<String>,
+    #[serde(rename = "type")]
+    type_: Option<Side>,
+    symbol: Option<String>,
 }
 
 #[derive(Deserialize, Serialize)]
 struct MatchFilter {
     user: Option<String>,
-    buyer: Option<String>,
-    seller: Option<String>,
-    stock: Option<String>,
+    symbol: Option<String>,
 }
 
 type Database = tokio_postgres::Client;
@@ -123,6 +131,18 @@ enum WebSocketMessage {
     Match(MatchFilter),
 }
 
+static ADD_QUERY: &str = "
+INSERT INTO orders (time_, user_id, type_, exec_type, symbol, amount, price)
+    VALUES ($1::BIGINT, $2::VARCHAR, $3::SMALLINT, $4::SMALLINT, $5::VARCHAR, $6::BIGINT, $7::BIGINT);";
+static COALESCE_ADDS: &str = "
+DELETE FROM orders
+    WHERE user_id=$1::VARCHAR
+        AND type_=$2::SMALLINT
+        AND excec_type=$3::SMALLINT
+        AND symbol=$4::VARCHAR
+        AND price=$5::BIGINT
+    RETURNING *;";
+
 async fn handle_socket(mut socket: WebSocket, pool: Arc<Database>) {
     while let Some(msg) = socket.recv().await {
         let Ok(msg) = msg else {tracing::warn!("Failed to recieve Message"); return;};
@@ -144,37 +164,62 @@ async fn handle_socket(mut socket: WebSocket, pool: Arc<Database>) {
 
         match msg {
             WebSocketMessage::Add(Add {
-                user,
-                side,
-                stock,
+                user_id,
+                type_,
+                symbol,
                 price,
-                quantity,
+                mut amount,
             }) => {
-                if let Err(err) = pool.query(
-                            "INSERT INTO orders (time_, user_id, type_, exec_type, symbol, amount, price) VALUES ($1, $2::VARCHAR, $3, $4::SMALLINT, $5::VARCHAR, $6::BIGINT, $7::BIGINT);",
-                            &[&chrono::offset::Utc::now().timestamp(),
-                            &user,
-                            &side.to_i16(),
+                match pool.query(
+                        COALESCE_ADDS,
+                        &[
+                            &user_id,
+                            &type_.to_i16(),
                             &0i16,
-                            &stock,
-                            &quantity,
-                            &price]
+                            &symbol,
+                            &price,
+                        ],
+                    ).await {
+                    Ok(rows) => {
+                        // Coalesce amount
+                        for row in rows.into_iter() {
+                            amount += row.get::<&str, i64>("amount");
+                        }
+                    },
+                    Err(err) => {
+                        tracing::warn!("Failed to execute query: {err}");
+                    }
+                }
+
+                if let Err(err) = pool.query(
+                        ADD_QUERY,
+                        &[&chrono::offset::Utc::now().timestamp(),
+                        &user_id,
+                        &type_.to_i16(),
+                        &0i16,
+                        &symbol,
+                        &amount,
+                        &price]
                         ).await {
                     tracing::warn!("Failed to execute query: {err}");
                 }
-                // let query = sqlx::query("INSERT INTO orders (time_, user_id, type_, exec_type, symbol, amount, price) VALUES (?, ?, ?, ?, ?, ?, ?);")
-                //         .bind(chrono::offset::Utc::now().timestamp_micros())
-                //         .bind(&user)
-                //         .bind(match side { Side::Buy => 0, Side::Sell => 1})
-                //         .bind(0)
-                //         .bind(&stock)
-                //         .bind(quantity)
-                //         .bind(price)
-                //         ;
-                // tracing::debug!("Running query: {}", query.sql());
-                // query.fetch_all(pool.deref()).await.expect("valid query");
             }
-            WebSocketMessage::Del(_) => todo!("Del"),
+            WebSocketMessage::Del(Del { user_id: user, type_: side, symbol: stock, price, amount: quantity }) => {
+                if let Err(err) = pool.query(
+                            "INSERT INTO orders (time_, user_id, type_, exec_type, symbol, amount, price) VALUES ($1, $2::VARCHAR, $3, $4::SMALLINT, $5::VARCHAR, $6::BIGINT, $7::BIGINT);",
+                            &[
+                                &chrono::offset::Utc::now().timestamp(),
+                                &user,
+                                &side.to_i16(),
+                                &0i16,
+                                &stock,
+                                &quantity,
+                                &price
+                            ]
+                        ).await {
+                    tracing::warn!("Failed to execute query: {err}");
+                }
+            }
             WebSocketMessage::List(_) => todo!("List"),
             WebSocketMessage::Match(_) => todo!("Match"),
         }

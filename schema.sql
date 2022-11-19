@@ -15,5 +15,5 @@ CREATE TABLE IF NOT EXISTS trades (
   user_id varchar,
   symbol varchar,
   amount int,
-  avg_price double
+  avg_price double precision
 );

@@ -1,5 +1,5 @@
 #!/bin/sh
 
-server='ws://127.0.0.1:3000/api'
+server='ws://127.0.0.1:3000/'
 
-echo '{"Add":{"user":"jalil","stock":"IBM","side":"sell","price":10,"quantity":100}}' | websocat "$server"
+echo '{"Add":{"user_id":"jalil","symbol":"IBM","type":"sell","price":10,"amount":100}}' | websocat "$server"
