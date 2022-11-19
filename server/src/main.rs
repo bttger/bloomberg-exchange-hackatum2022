@@ -1,33 +1,45 @@
 use std::sync::{Arc, RwLock};
 
-use axum::{extract::Path, http::StatusCode, routing::get, Json, Router};
+use axum::{
+    http::StatusCode,
+    routing::{get, post},
+    Json, Router,
+};
 use serde::{Deserialize, Serialize};
+use uuid::Uuid;
 
-#[derive(Debug, Deserialize, Clone, Serialize, PartialEq, Eq)]
-enum Action {
-    Add,
-    Del,
-    List,
-    Match,
-}
+type State = RwLock<()>;
+type ServerResult<T> = Result<T, StatusCode>;
 
-#[derive(Debug, Clone, Serialize)]
-struct Entry {
-    kind: Action,
-    user: String,
-    security: String,
-    side: Side,
-    quantity: u64,
-    price: u64,
-}
-
-#[derive(Debug, Clone, Serialize)]
+#[derive(Deserialize, Serialize)]
 enum Side {
+    #[serde(rename = "buy")]
     Buy,
+    #[serde(rename = "sell")]
     Sell,
 }
 
-type State = RwLock<Vec<Entry>>;
+#[derive(Deserialize, Serialize)]
+struct Add {
+    user: Uuid,
+    side: Side,
+    stock: String,
+    price: u64,
+    quantity: u64,
+}
+
+#[derive(Deserialize, Serialize)]
+struct Del {}
+
+#[derive(Deserialize, Serialize)]
+struct ListFilter {
+    user: Option<Uuid>,
+    side: Option<Side>,
+    stock: Option<String>,
+}
+
+#[derive(Deserialize, Serialize)]
+struct MatchFilter {}
 
 #[tokio::main]
 async fn main() {
@@ -36,14 +48,31 @@ async fn main() {
     let app = Router::new()
         .route("/", get(|| async { "To access the API got to /api" }))
         .route(
-            "/api/:action",
+            "/api/match",
             get({
                 let state = Arc::clone(&state);
-                move |action| api_get(action, state)
-            })
-            .post({
+                move |body| get_match(body, state)
+            }),
+        )
+        .route(
+            "/api/list",
+            get({
                 let state = Arc::clone(&state);
-                move |action| api_post(action, state)
+                move |body| get_list(body, state)
+            }),
+        )
+        .route(
+            "/api/del",
+            post({
+                let state = Arc::clone(&state);
+                move |body| post_del(body, state)
+            }),
+        )
+        .route(
+            "/api/add",
+            post({
+                let state = Arc::clone(&state);
+                move |body| post_add(body, state)
             }),
         );
 
@@ -54,37 +83,18 @@ async fn main() {
         .unwrap();
 }
 
-async fn api_get(
-    Path(action): Path<Action>,
-    state: Arc<State>,
-) -> Result<Json<Vec<Entry>>, StatusCode> {
-    use Action::*;
-
-    let read = state.read().expect("Valid Mutex");
-
-    match action {
-        List => Ok(Json(read.to_vec())),
-        Match => Ok(Json(
-            read.iter()
-                .filter(|entry| entry.kind == Action::Match)
-                .cloned()
-                .collect(),
-        )),
-        Add | Del => Err(StatusCode::BAD_REQUEST),
-    }
+async fn post_add(Json(_body): Json<Add>, _state: Arc<State>) -> ServerResult<()> {
+    Err(StatusCode::NOT_IMPLEMENTED)
 }
 
-async fn api_post(
-    Path(action): Path<Action>,
-    state: Arc<State>,
-) -> Result<&'static str, StatusCode> {
-    use Action::*;
+async fn post_del(Json(_body): Json<Del>, _state: Arc<State>) -> ServerResult<()> {
+    Err(StatusCode::NOT_IMPLEMENTED)
+}
 
-    let _write = state.write().expect("Valid Mutex");
+async fn get_list(Json(_body): Json<ListFilter>, _state: Arc<State>) -> ServerResult<()> {
+    Err(StatusCode::NOT_IMPLEMENTED)
+}
 
-    match action {
-        Add => todo!(),
-        Del => todo!(),
-        List | Match => Err(StatusCode::BAD_REQUEST),
-    }
+async fn get_match(Json(_body): Json<MatchFilter>, _state: Arc<State>) -> ServerResult<()> {
+    Err(StatusCode::NOT_IMPLEMENTED)
 }
