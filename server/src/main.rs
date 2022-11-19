@@ -1,11 +1,12 @@
-use std::sync::{Arc, RwLock};
-
 use axum::{
+    extract::ws::{Message, WebSocket, WebSocketUpgrade},
     http::StatusCode,
-    routing::{get, post},
-    Json, Router,
+    response::Response,
+    routing::get,
+    Router,
 };
 use serde::{Deserialize, Serialize};
+use std::sync::{Arc, RwLock};
 use uuid::Uuid;
 
 type State = RwLock<()>;
@@ -47,34 +48,8 @@ async fn main() {
 
     let app = Router::new()
         .route("/", get(|| async { "To access the API got to /api" }))
-        .route(
-            "/api/match",
-            get({
-                let state = Arc::clone(&state);
-                move |body| get_match(body, state)
-            }),
-        )
-        .route(
-            "/api/list",
-            get({
-                let state = Arc::clone(&state);
-                move |body| get_list(body, state)
-            }),
-        )
-        .route(
-            "/api/del",
-            post({
-                let state = Arc::clone(&state);
-                move |body| post_del(body, state)
-            }),
-        )
-        .route(
-            "/api/add",
-            post({
-                let state = Arc::clone(&state);
-                move |body| post_add(body, state)
-            }),
-        );
+        .route("/api", get(api));
+    // TODO: Add update API route to easily change Pricing
 
     // run it with hyper on localhost:3000
     axum::Server::bind(&"0.0.0.0:3000".parse().unwrap())
@@ -83,18 +58,28 @@ async fn main() {
         .unwrap();
 }
 
-async fn post_add(Json(_body): Json<Add>, _state: Arc<State>) -> ServerResult<()> {
-    Err(StatusCode::NOT_IMPLEMENTED)
+async fn api(ws: WebSocketUpgrade) -> Response {
+    ws.on_upgrade(handle_socket)
 }
 
-async fn post_del(Json(_body): Json<Del>, _state: Arc<State>) -> ServerResult<()> {
-    Err(StatusCode::NOT_IMPLEMENTED)
+#[derive(Serialize, Deserialize)]
+enum WebSocketMessage {
+    Add(Add),
+    Del(Del),
+    List(ListFilter),
+    Match(MatchFilter),
 }
 
-async fn get_list(Json(_body): Json<ListFilter>, _state: Arc<State>) -> ServerResult<()> {
-    Err(StatusCode::NOT_IMPLEMENTED)
-}
+async fn handle_socket(mut socket: WebSocket) {
+    while let Some(msg) = socket.recv().await {
+        let Ok(msg) = msg else {return;};
 
-async fn get_match(Json(_body): Json<MatchFilter>, _state: Arc<State>) -> ServerResult<()> {
-    Err(StatusCode::NOT_IMPLEMENTED)
+        // Parse Message
+
+        // Reply
+        if socket.send(msg).await.is_err() {
+            // Client Disconnected
+            return;
+        }
+    }
 }
