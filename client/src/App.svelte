@@ -4,6 +4,7 @@
   import Navbar from "./lib/Navbar.svelte";
   import TradeForm from "./lib/TradeForm.svelte";
   import AggOrderBook from "./lib/AggOrderBook.svelte";
+  import { onMount } from "svelte";
 
   let aggOrderBook = {
     timestamp: 8274242333,
@@ -58,9 +59,22 @@
   ];
 
   function onCommand(event) {
-    console.log(event.detail);
-    // TODO
+    socket.send(event.detail);
   }
+
+  let socket;
+
+  onMount(() => {
+    socket = new WebSocket("ws://127.0.0.1:3000/api");
+    socket.addEventListener("message", (event) => {
+      if (event.data.messageType === "aggOrderBook") {
+        aggOrderBook = JSON.parse(event.data);
+      }
+      if (event.data.messageType === "trade") {
+        trades.push(JSON.parse(event.data));
+      }
+    });
+  });
 </script>
 
 <main>
