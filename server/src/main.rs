@@ -133,14 +133,14 @@ enum WebSocketMessage {
 
 static ADD_QUERY: &str = "
 INSERT INTO orders (time_, user_id, type_, exec_type, symbol, amount, price)
-    VALUES ($1::BIGINT, $2::VARCHAR, $3::SMALLINT, $4::SMALLINT, $5::VARCHAR, $6::BIGINT, $7::BIGINT);";
+    VALUES ($1::BIGINT, $2::VARCHAR, $3::SMALLINT, $4::SMALLINT, $5::VARCHAR, $6::INT, $7::INT);";
 static COALESCE_ADDS: &str = "
 DELETE FROM orders
     WHERE user_id=$1::VARCHAR
         AND type_=$2::SMALLINT
         AND exec_type=$3::SMALLINT
         AND symbol=$4::VARCHAR
-        AND price=$5::BIGINT
+        AND price=$5::INT
     RETURNING *;";
 
 async fn handle_socket(mut socket: WebSocket, pool: Arc<Database>) {
