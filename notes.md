@@ -42,13 +42,13 @@ avg_price float (when multiple entries from order book needed to fulfil trade)
 # API
 
 - Single websocket endpoint (server view)
-  - onOpen: OBS sends aggregated order book and last n trades
+  - onOpen: OBS, initializes connection with new user id, sends aggregated order book and last n trades
   - onMessage: OBS checks and executes command (add, delete)
   - onClose: clean up connection, delete user ID
 
 ## Structs
 
-```json
+```
 aggOrderBook: {
     ask: [{
         price float
