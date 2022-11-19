@@ -20,6 +20,7 @@
 # Tables
 
 ## Orders
+```
 id string (uuid or nano id)
 time int (unix timestamp)
 user_id string (random maybe in pattern user#123)
@@ -27,13 +28,16 @@ type enum ('bid', 'ask')
 exec_type enum ('market', 'limit')
 amount float
 price float (optional, only for limit orders)
+```
 
 ## Trades
+```
 id string (uuid or nano id)
 time int (unix timestamp)
 user_id string
 amount float
 avg_price float (when multiple entries from order book needed to fulfil trade)
+```
 
 # API
 
@@ -44,6 +48,7 @@ avg_price float (when multiple entries from order book needed to fulfil trade)
 
 ## Structs
 
+```json
 aggOrderBook: {
     ask: [{
         price float
@@ -65,3 +70,5 @@ trades: [{
     amount float
     total float
 }]
+
+```
