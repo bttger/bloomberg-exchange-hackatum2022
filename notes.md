@@ -95,36 +95,6 @@ SELECT timestamp, user_id, amount, avg_price FROM trades WHERE symbol = $symbol 
 
 **getAggOrderBook(symbol string)** (only queried on client init and order event by OBS)
 ```sql
-example orders:
-2 794
-5 789
-
-example ranges:
->=5 
->=4
->=3
->=2
-
-SELECT max(price) FROM orders WHERE type = 'bid' AND exec_type = 'limit' AND symbol = $symbol
-
-is min/max bigger than 1/10/100/1000? => multiply by factor; use as start/end for range; divide range values by factor
-
-
-
-WITH ranges AS (SELECT generate_series(
-    (
-    SELECT max(price) FROM orders WHERE type = 'bid' AND exec_type = 'limit' AND symbol = $symbol
-  ), (
-    SELECT min(price) FROM orders WHERE type = 'bid' AND exec_type = 'limit' AND symbol = $symbol
-  ), 1
-) as range_from)
-SELECT
-  ranges.range_from / 10 AS range_from,
-  (SELECT sum(amount) FROM orders WHERE type = 'bid' AND exec_type = 'limit' AND symbol = $symbol AND price >= range_from AND price < range_from + 1) AS amount,
-  (SELECT sum() FROM orders WHERE type = 'bid' AND exec_type = 'limit' AND symbol = $symbol AND price >= range_from AND price < range_from + 1 GROUP BY price) AS total
-FROM orders
-WHERE type = 'ask' AND symbol = $symbol;
-
 SELECT price, sum(amount) AS total_amount, total_amount * price AS total_price
 FROM orders
 WHERE type_ = 0 AND exec_type = 1 AND symbol = $symbol
