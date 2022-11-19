@@ -33,7 +33,7 @@ For now we will hard-code the security symbol that clients trade on the exchange
 
 ## Orders
 ```
-id varchar (uuid or nano id, assigned by OBS)
+id bigserial (autoincrementing)
 timestamp bigint (unix timestamp)
 user_id varchar (users send it with commands)
 type smallint ('bid'=0, 'ask'=1)
@@ -45,7 +45,7 @@ price int (optional, only for limit orders)
 
 ## Trades
 ```
-id varchar (uuid or nano id, assigned by MS)
+id bigserial (autoincrementing)
 timestamp bigint (unix timestamp)
 user_id varchar
 symbol varchar
@@ -56,7 +56,7 @@ avg_price double (when multiple entries from order book needed to fulfil trade)
 ## Schema
 ```sql
 CREATE TABLE IF NOT EXISTS orders (
-  id varchar PRIMARY KEY,
+  id bigserial PRIMARY KEY,
   time_ bigint,
   user_id varchar,
   type_ smallint,
@@ -67,7 +67,7 @@ CREATE TABLE IF NOT EXISTS orders (
 );
 
 CREATE TABLE IF NOT EXISTS trades (
-  id varchar PRIMARY KEY,
+  id bigserial PRIMARY KEY,
   time_ bigint,
   user_id varchar,
   symbol varchar,
@@ -80,12 +80,12 @@ CREATE TABLE IF NOT EXISTS trades (
 
 **addOrder(args[])** (executed by OBS)
 ```sql
-INSERT INTO orders VALUES (id, time_, user_id, type_, exec_type, symbol, amount, price);
+INSERT INTO orders (time_, user_id, type_, exec_type, symbol, amount, price) VALUES (?, ?, ?, ?, ?, ?, ?);
 ```
 
 **addTrade(args[])** (executed by MS)
 ```sql
-INSERT INTO trades VALUES (id, time_, user_id, symbol, amount, avg_price);
+INSERT INTO trades (time_, user_id, symbol, amount, avg_price) VALUES (?, ?, ?, ?, ?);
 ```
 
 **getLatestTrades(number int)** (only queried on client init and trade event by OBS)
