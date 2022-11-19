@@ -9,13 +9,18 @@ use axum::{
 };
 use serde::{Deserialize, Serialize};
 use sqlx::postgres::{PgConnection, PgPoolOptions};
-use std::{net::SocketAddr, sync::Arc};
+use std::{
+    net::SocketAddr,
+    sync::{atomic::AtomicU64, Arc},
+};
 use tower_http::trace::{DefaultMakeSpan, TraceLayer};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 // use uuid::Uuid;
 
 // type State = RwLock<()>;
 // type ServerResult<T> = Result<T, StatusCode>;
+
+static ORDER_ID: AtomicU64 = AtomicU64::new(0);
 
 #[derive(Deserialize, Serialize)]
 enum Side {
@@ -132,7 +137,23 @@ async fn handle_socket(mut socket: WebSocket, _pool: Arc<PgConnection>) {
         };
 
         match msg {
-            WebSocketMessage::Add(_) => todo!("Add"),
+            WebSocketMessage::Add(Add {
+                user,
+                side,
+                stock,
+                price,
+                quantity,
+            }) => {
+                sqlx::query!(
+                    "INSERT INTO orders VALUES (?, ?, ?, ?, ?, ?);",
+                    ORDER_ID,
+                    chrono::offset::Utc::now().timestamp_micros(),
+                    &user,
+                    &stock,
+                    quantity,
+                    price
+                )
+            }
             WebSocketMessage::Del(_) => todo!("Del"),
             WebSocketMessage::List(_) => todo!("List"),
             WebSocketMessage::Match(_) => todo!("Match"),
