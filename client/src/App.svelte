@@ -1,45 +1,73 @@
 <script>
-  import svelteLogo from './assets/svelte.svg'
-  import Counter from './lib/Counter.svelte'
+  import Chart from "./lib/Chart.svelte";
+  import FlexContainer from "./lib/FlexContainer.svelte";
+  import Navbar from "./lib/Navbar.svelte";
+  import TradeForm from "./lib/TradeForm.svelte";
+  import AggOrderBook from "./lib/AggOrderBook.svelte";
+
+  let aggOrderBook = {
+    timestamp: 8274242333,
+    ask: [
+      {
+        price: 9,
+        amount: 20,
+        total: 160,
+      },
+      {
+        price: 8,
+        amount: 20,
+        total: 160,
+      },
+    ],
+    bid: [
+      {
+        price: 7,
+        amount: 20,
+        total: 150,
+      },
+      {
+        price: 5,
+        amount: 20,
+        total: 100,
+      },
+      {
+        price: 4,
+        amount: 10,
+        total: 40,
+      },
+    ],
+  };
+
+  let trades = [
+    {
+      userId: "tom",
+      symbol: "TWTR",
+      timestamp: 1668876837,
+      price: 8,
+      amount: 20,
+      total: 160,
+    },
+    {
+      userId: "tom",
+      symbol: "TWTR",
+      timestamp: 1668886837,
+      price: 9,
+      amount: 20,
+      total: 160,
+    },
+  ];
+
+  function onCommand(event) {
+    console.log(event.detail);
+    // TODO
+  }
 </script>
 
 <main>
-  <div>
-    <a href="https://vitejs.dev" target="_blank" rel="noreferrer"> 
-      <img src="/vite.svg" class="logo" alt="Vite Logo" />
-    </a>
-    <a href="https://svelte.dev" target="_blank" rel="noreferrer"> 
-      <img src={svelteLogo} class="logo svelte" alt="Svelte Logo" />
-    </a>
-  </div>
-  <h1>Vite + Svelte</h1>
-
-  <div class="card">
-    <Counter />
-  </div>
-
-  <p>
-    Check out <a href="https://github.com/sveltejs/kit#readme" target="_blank" rel="noreferrer">SvelteKit</a>, the official Svelte app framework powered by Vite!
-  </p>
-
-  <p class="read-the-docs">
-    Click on the Vite and Svelte logos to learn more
-  </p>
+  <Navbar />
+  <FlexContainer>
+    <AggOrderBook {aggOrderBook} />
+    <Chart {trades} />
+  </FlexContainer>
+  <TradeForm on:command={onCommand} />
 </main>
-
-<style>
-  .logo {
-    height: 6em;
-    padding: 1.5em;
-    will-change: filter;
-  }
-  .logo:hover {
-    filter: drop-shadow(0 0 2em #646cffaa);
-  }
-  .logo.svelte:hover {
-    filter: drop-shadow(0 0 2em #ff3e00aa);
-  }
-  .read-the-docs {
-    color: #888;
-  }
-</style>
