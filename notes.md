@@ -13,9 +13,9 @@ For now we will hard-code the security symbol that clients trade on the exchange
   - server sends unique user ID maintained for the socket session (makes it simpler for us so we don't need to implement authentication)
   - -"- SELECTs and forwards latest aggregated order book and last n trades from relational DB (e.g. Postgres with Timescale extension; throttled/cached to 1 req/X ms)
   - -"- forwards all events from the trade channel
-  - -"- on event in order channel, SELECT latest aggregated order book and forward (throttled/cached to 1 req/X ms)
+  - -"- on event in order channel, SELECT latest aggregated order book and forward to all clients (throttled/cached to 1 req/X ms)
   - -"- listens for order commands (add immediate or limit order; delete order)
-- client with ID=X sends order command
+- client sends order command with his ID
   - OBS updates DB
   - -"- publishes event in order channel (which the matching server and all clients are subscribed to)
 
@@ -33,24 +33,24 @@ For now we will hard-code the security symbol that clients trade on the exchange
 
 ## Orders
 ```
-id string (uuid or nano id, assigned by OBS)
-timestamp int (unix timestamp)
-user_id string (users send it with commands)
-type enum ('bid'=0, 'ask'=1)
-exec_type enum ('market'=0, 'limit'=1)
-symbol string
-amount float
-price float (optional, only for limit orders)
+id varchar (uuid or nano id, assigned by OBS)
+timestamp bigint (unix timestamp)
+user_id varchar (users send it with commands)
+type smallint ('bid'=0, 'ask'=1)
+exec_type smallint ('market'=0, 'limit'=1)
+symbol varchar
+amount int
+price int (optional, only for limit orders)
 ```
 
 ## Trades
 ```
-id string (uuid or nano id, assigned by MS)
-timestamp int (unix timestamp)
-user_id string
-symbol string
-amount float
-avg_price float (when multiple entries from order book needed to fulfil trade)
+id varchar (uuid or nano id, assigned by MS)
+timestamp bigint (unix timestamp)
+user_id varchar
+symbol varchar
+amount int
+avg_price double (when multiple entries from order book needed to fulfil trade)
 ```
 
 ## Schema
@@ -72,7 +72,7 @@ CREATE TABLE IF NOT EXISTS trades (
   user_id varchar,
   symbol varchar,
   amount int,
-  avg_price int
+  avg_price double
 );
 ```
 
@@ -80,17 +80,17 @@ CREATE TABLE IF NOT EXISTS trades (
 
 **addOrder(args[])** (executed by OBS)
 ```sql
-INSERT INTO orders VALUES (id, timestamp, user_id, type, exec_type, symbol, amount, price);
+INSERT INTO orders VALUES (id, time_, user_id, type_, exec_type, symbol, amount, price);
 ```
 
 **addTrade(args[])** (executed by MS)
 ```sql
-INSERT INTO trades VALUES (id, timestamp, user_id, symbol, amount, avg_price);
+INSERT INTO trades VALUES (id, time_, user_id, symbol, amount, avg_price);
 ```
 
 **getLatestTrades(number int)** (only queried on client init and trade event by OBS)
 ```sql
-SELECT timestamp, user_id, amount, avg_price FROM trades WHERE symbol = $symbol ORDER BY timestamp DESC LIMIT $number;
+SELECT time_, user_id, amount, avg_price FROM trades WHERE symbol = $symbol ORDER BY time_ DESC LIMIT $number;
 ```
 
 **getAggOrderBook(symbol string)** (only queried on client init and order event by OBS)
@@ -107,6 +107,42 @@ WHERE type_ = 1 AND exec_type = 1 AND symbol = $symbol
 GROUP BY price
 ORDER BY price DESC;
 ```
+
+**getMatchingOrders(symbol string, type_ smallint, amount int, optional price int)** (only queried on new order event by MS)
+
+market order (we don't save the order in the DB but immediately execute it with the closest possible buy/sell orders; what if there are not enough items to trade on the exchange?):
+```sql
+SELECT *
+FROM orders
+WHERE CASE
+  WHEN $type_ = 0
+  THEN type_ = 1
+  ELSE type_ = 0
+END AND symbol = $symbol
+ORDER BY time_ ASC;
+```
+
+limit order (we get all buy orders that overlap in price with sell orders, and then execute them by FIFO principle until the amount of the sell orders is exhausted; the following query must be executed multiple times if the amounts of the lowest ask price is not sufficient to fulfill bid order):
+```sql
+ask 30
+ask 29
+ask 28 300
+ask 27 100 # amount is not sufficient
+bid 28 300
+bid 26
+bid 23
+
+SELECT *
+FROM orders
+WHERE type_ = 0 AND symbol = $symbol AND price >= (
+  SELECT min(price)
+  FROM orders
+  WHERE type_ = 1 AND symbol = $symbol
+  )
+ORDER BY time_ ASC;
+```
+
+
 
 # API
 
