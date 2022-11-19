@@ -33,11 +33,11 @@ For now we will hard-code the security symbol that clients trade on the exchange
 
 ## Orders
 ```
-id string (uuid or nano id)
+id string (uuid or nano id, assigned by OBS)
 timestamp int (unix timestamp)
-user_id string (random maybe in pattern user#123)
-type enum ('bid', 'ask')
-exec_type enum ('market', 'limit')
+user_id string (users send it with commands)
+type enum ('bid'=0, 'ask'=1)
+exec_type enum ('market'=0, 'limit'=1)
 symbol string
 amount float
 price float (optional, only for limit orders)
@@ -45,12 +45,35 @@ price float (optional, only for limit orders)
 
 ## Trades
 ```
-id string (uuid or nano id)
+id string (uuid or nano id, assigned by MS)
 timestamp int (unix timestamp)
 user_id string
 symbol string
 amount float
 avg_price float (when multiple entries from order book needed to fulfil trade)
+```
+
+## Schema
+```sql
+CREATE TABLE IF NOT EXISTS orders (
+  id varchar
+  timestamp int
+  user_id varchar
+  type smallint
+  exec_type smallint
+  symbol varchar
+  amount double
+  price double
+);
+
+CREATE TABLE IF NOT EXISTS trades (
+  id varchar
+  timestamp int
+  user_id varchar
+  symbol varchar
+  amount double
+  avg_price double
+);
 ```
 
 ## Queries
@@ -83,10 +106,23 @@ example ranges:
 >=9.4
 
 SELECT max(price) FROM orders WHERE type = 'bid' AND exec_type = 'limit' AND symbol = $symbol
-SELECT min(price) FROM orders WHERE type = 'bid' AND exec_type = 'limit'
 
-WITH rangeTable AS (SELECT )
-SELECT price, amount, price * amount AS total FROM orders WHERE type = 'ask' AND symbol = $symbol GROUP BY ...;TODO
+is min/max bigger than 1/10/100/1000? => multiply by factor; use as start/end for range; divide range values by factor
+
+
+
+WITH ranges AS (SELECT generate_series(
+    (
+    SELECT max(price) FROM orders WHERE type = 'bid' AND exec_type = 'limit' AND symbol = $symbol
+  ), (
+    SELECT min(price) FROM orders WHERE type = 'bid' AND exec_type = 'limit' AND symbol = $symbol
+  ), 1
+) as range_from)
+SELECT
+  ranges.range_from / 10 AS range_from,
+  (SELECT sum(amount) FROM orders WHERE price >= range_from AND price < ?)amount, price * amount AS total
+FROM orders
+WHERE type = 'ask' AND symbol = $symbol;
 ```
 
 **TODO()**
