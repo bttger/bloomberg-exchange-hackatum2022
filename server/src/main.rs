@@ -9,6 +9,7 @@ use axum::{
 };
 use serde::{Deserialize, Serialize};
 use std::{net::SocketAddr, sync::Arc};
+use tokio_postgres::types::ToSql;
 use tower_http::trace::{DefaultMakeSpan, TraceLayer};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
@@ -28,6 +29,7 @@ impl Side {
         }
     }
 
+    #[allow(dead_code)]
     fn other(&self) -> Self {
         match self {
             Side::Buy => Self::Sell,
@@ -143,7 +145,66 @@ DELETE FROM orders
         AND price=$5::INT
     RETURNING *;";
 
-async fn handle_socket(mut socket: WebSocket, pool: Arc<Database>) {
+async fn hande_add(
+    Add {
+        user_id,
+        type_,
+        symbol,
+        price,
+        mut amount,
+    }: Add,
+    database: Arc<Database>,
+) {
+    let prev_trades_params: [&(dyn ToSql + Sync); 5] =
+        [&user_id, &type_.to_i16(), &0i16, &symbol, &price];
+    let prev_trades_query = database.query(COALESCE_ADDS, &prev_trades_params);
+
+    // TODO: Find matches and update trade history
+
+    let (prev_trades,) = tokio::join!(prev_trades_query);
+
+    match prev_trades {
+        Ok(rows) => {
+            // Coalesce amount
+            for row in rows.into_iter() {
+                amount += row.get::<&str, i32>("amount");
+            }
+        }
+        Err(err) => {
+            tracing::warn!("Failed to execute query: {err}");
+        }
+    }
+
+    if let Err(err) = database
+        .query(
+            ADD_QUERY,
+            &[
+                &chrono::offset::Utc::now().timestamp(),
+                &user_id,
+                &type_.to_i16(),
+                &0i16,
+                &symbol,
+                &amount,
+                &price,
+            ],
+        )
+        .await
+    {
+        tracing::warn!("Failed to execute query: {err}");
+    }
+}
+
+async fn handle_list(_: ListFilter, database: Arc<Database>, _socket: &mut WebSocket) {
+    // TODO: handle filter params
+    match database.query("SELECT * FROM orders;", &[]).await {
+        Ok(_rows) => todo!(), //socket.send(Message::Text(&rows.join(","))).await.unwrap(),
+        Err(err) => {
+            tracing::warn!("Failed to execute list query: {err}");
+        }
+    };
+}
+
+async fn handle_socket(mut socket: WebSocket, database: Arc<Database>) {
     while let Some(msg) = socket.recv().await {
         let Ok(msg) = msg else {tracing::warn!("Failed to recieve Message"); return;};
         // Parse Message
@@ -163,49 +224,10 @@ async fn handle_socket(mut socket: WebSocket, pool: Arc<Database>) {
         };
 
         match msg {
-            WebSocketMessage::Add(Add {
-                user_id,
-                type_,
-                symbol,
-                price,
-                mut amount,
-            }) => {
-                match pool.query(
-                        COALESCE_ADDS,
-                        &[
-                            &user_id,
-                            &type_.to_i16(),
-                            &0i16,
-                            &symbol,
-                            &price,
-                        ],
-                    ).await {
-                    Ok(rows) => {
-                        // Coalesce amount
-                        for row in rows.into_iter() {
-                            amount += row.get::<&str, i32>("amount");
-                        }
-                    },
-                    Err(err) => {
-                        tracing::warn!("Failed to execute query: {err}");
-                    }
-                }
-
-                if let Err(err) = pool.query(
-                        ADD_QUERY,
-                        &[&chrono::offset::Utc::now().timestamp(),
-                        &user_id,
-                        &type_.to_i16(),
-                        &0i16,
-                        &symbol,
-                        &amount,
-                        &price]
-                        ).await {
-                    tracing::warn!("Failed to execute query: {err}");
-                }
+            WebSocketMessage::Add(add) => { hande_add(add, database.clone()).await
             }
             WebSocketMessage::Del(Del { user_id: user, type_: side, symbol: stock, price, amount: quantity }) => {
-                if let Err(err) = pool.query(
+                if let Err(err) = database.query(
                             "INSERT INTO orders (time_, user_id, type_, exec_type, symbol, amount, price) VALUES ($1, $2::VARCHAR, $3, $4::SMALLINT, $5::VARCHAR, $6::BIGINT, $7::BIGINT);",
                             &[
                                 &chrono::offset::Utc::now().timestamp(),
@@ -220,7 +242,7 @@ async fn handle_socket(mut socket: WebSocket, pool: Arc<Database>) {
                     tracing::warn!("Failed to execute query: {err}");
                 }
             }
-            WebSocketMessage::List(_) => todo!("List"),
+            WebSocketMessage::List(list) => handle_list(list, database.clone(), &mut socket).await,
             WebSocketMessage::Match(_) => todo!("Match"),
         }
     }
